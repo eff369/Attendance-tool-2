@@ -37,13 +37,11 @@
             lines.forEach(line => {
                 const upperLine = line.trim().toUpperCase();
                 
-                // FIXED: Strict section header matches so they never cross-trigger on personnel data lines
                 if (upperLine.includes("OH NSF") || upperLine.includes("MOVEMENT CHART")) { currentSection = "OFFICE_HOURS"; return; }
                 if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
                 if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
                 if (upperLine.includes("ROTA 3")) { currentSection = "ROTA_3"; return; }
                 
-                // Strictly ignore the EMS standalone header row without skipping EMS personnel lines
                 if (upperLine === "EMS TEAM:" || upperLine === "EMS TEAM") { return; } 
 
                 if (line.includes("-")) {
@@ -52,16 +50,17 @@
                         let rightSide = parts[1].toUpperCase().trim();
                         let finalStatus = "";
 
-                        // Condition 1: Map operational deployment tasks to standard "IN" status
-                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
+                        // STEP 1: Strict operational keyword intercept. 
+                        // If any of these are present, forcefully set it to "IN" immediately.
+                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("FORUMS") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
                             finalStatus = "IN";
                         } else {
-                            // Condition 2: Simplify "LATE" entries cleanly to "IN"
+                            // STEP 2: Simplify late entries
                             if (/\bIN\b.*LATE/.test(rightSide) || /LATE.*\bIN\b/.test(rightSide)) {
                                 rightSide = "IN";
                             }
 
-                            // Condition 3: Match layout complex composite phrases
+                            // STEP 3: Check for exact complex composite phrases
                             const complexPhrases = [
                                 "AM IN PM VL", "AM VL PM IN", "AM TO PM IN", "AM IN PM TO", 
                                 "AM PM MC", "AM PM TO", "AM PM VL", "AM TO PM MIN", "AM PM HRI", 
@@ -73,7 +72,7 @@
                             if (foundComplex) {
                                 finalStatus = foundComplex;
                             } else {
-                                // Condition 4: Extract bracketed texts or single code words
+                                // STEP 4: Standard bracket/word extraction fallback
                                 const bracketMatch = rightSide.match(/\(([^)]+)\)/);
                                 let potentialStatus = "";
                                 
@@ -109,7 +108,6 @@
                             }
                         }
 
-                        // Save to target sorting bucket
                         if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
                         if (currentSection === "ROTA_1") rota1.push(finalStatus);
                         if (currentSection === "ROTA_2") rota2.push(finalStatus);
