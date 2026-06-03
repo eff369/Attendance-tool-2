@@ -26,7 +26,7 @@
         function processAndCopy() {
             let text = document.getElementById('inputText').value;
             
-            // CRITICAL FIX: Convert any decorative long dashes (En Dash/Em Dash) into standard short hyphens
+            // Convert any decorative long dashes (En Dash/Em Dash) into standard short hyphens
             text = text.replace(/[\u2010-\u2015—–]/g, "-");
             
             const lines = text.split('\n');
@@ -41,19 +41,21 @@
             lines.forEach(line => {
                 const upperLine = line.trim().toUpperCase();
                 
-                // FIXED: Strict section header matches so they never cross-trigger on personnel data lines
                 if (upperLine.includes("OH NSF") || upperLine.includes("MOVEMENT CHART")) { currentSection = "OFFICE_HOURS"; return; }
                 if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
                 if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
                 if (upperLine.includes("ROTA 3")) { currentSection = "ROTA_3"; return; }
                 
-                // Strictly ignore the EMS standalone header row without skipping EMS personnel lines
                 if (upperLine === "EMS TEAM:" || upperLine === "EMS TEAM") { return; } 
 
                 if (line.includes("-")) {
                     const parts = line.split(/-+/);
                     if (parts.length >= 2) {
                         let rightSide = parts[1].toUpperCase().trim();
+                        
+                        // FIX: Forcefully strip out commas so "AM IN, PM MA" becomes "AM IN PM MA"
+                        rightSide = rightSide.replace(/,/g, "").replace(/\s+/g, " ");
+                        
                         let finalStatus = "";
 
                         // Condition 1: Map operational deployment tasks to standard "IN" status
