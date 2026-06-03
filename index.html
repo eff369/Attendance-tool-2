@@ -44,14 +44,17 @@
                 
                 if (upperLine === "EMS TEAM:" || upperLine === "EMS TEAM") { return; } 
 
-                if (line.includes("-")) {
-                    const parts = line.split(/-+/);
+                // FIX: Detect any form of dash character (hyphen, en-dash, em-dash, etc.)
+                const dashRegex = /[\u2010-\u2015\-—–]+/;
+                
+                if (dashRegex.test(line)) {
+                    // Splits the line cleanly regardless of the type of dash used
+                    const parts = line.split(dashRegex);
                     if (parts.length >= 2) {
                         let rightSide = parts[1].toUpperCase().trim();
                         let finalStatus = "";
 
-                        // STEP 1: Strict operational keyword intercept. 
-                        // If any of these are present, forcefully set it to "IN" immediately.
+                        // STEP 1: Operational keyword intercepts
                         if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("FORUMS") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
                             finalStatus = "IN";
                         } else {
@@ -64,7 +67,7 @@
                             const complexPhrases = [
                                 "AM IN PM VL", "AM VL PM IN", "AM TO PM IN", "AM IN PM TO", 
                                 "AM PM MC", "AM PM TO", "AM PM VL", "AM TO PM MIN", "AM PM HRI", 
-                                "AM COA PM", "AM HRI PM", "AM PM HQ", "AM PM MMA", "AM PM TO MIN", "AM IN PM MA"
+                                "AM CDA PM", "AM HRI PM", "AM PM HQ", "AM PM MMA", "AM PM TO MIN", "AM IN PM MA", "EMS FORUM"
                             ];
                             
                             let foundComplex = complexPhrases.find(phrase => rightSide.includes(phrase));
