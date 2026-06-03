@@ -3,59 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Direct Column Formatter</title>
+    <title>Master Attendance Formatter</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background-color: #f6f8fa; }
-        textarea { width: 100%; height: 200px; padding: 12px; border: 1px solid #d0d7de; border-radius: 6px; box-sizing: border-box; font-family: monospace; font-size: 14px; }
-        button { background-color: #2da44e; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: 600; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 15px; margin-bottom: 15px;}
+        textarea { width: 100%; height: 280px; padding: 12px; border: 1px solid #d0d7de; border-radius: 6px; box-sizing: border-box; font-family: monospace; font-size: 14px; margin-bottom: 10px; }
+        button { background-color: #2da44e; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: 600; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 5px; margin-bottom: 15px;}
         button:hover { background-color: #2c974b; }
         .success-box { display: none; background-color: #dafbe1; color: #1a7f37; padding: 12px; border-radius: 6px; border: 1px solid #4ac26b; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
 
-    <h2>Direct Attendance Column Extractor</h2>
-    <p>Paste the raw WhatsApp message text below:</p>
-    <textarea id="inputText" placeholder="Paste your WhatsApp text block here..."></textarea>
+    <h2>Master Attendance Column Extractor</h2>
+    <p>Paste ALL your daily messages here (Office Hours + Rotas) in any order:</p>
+    <textarea id="inputText" placeholder="Paste all WhatsApp updates here..."></textarea>
     
-    <button onclick="processAndCopy()">Extract & Copy Column</button>
+    <button onclick="processAndCopy()">Sort & Copy Entire Column</button>
     
-    <div id="successMessage" class="success-box">Copied! Select the top cell of today's column in Excel and hit Ctrl+V.</div>
+    <div id="successMessage" class="success-box">Copied! Select cell E15 (LCP IRFAN) and hit Ctrl+V.</div>
 
     <script>
         function processAndCopy() {
             const text = document.getElementById('inputText').value;
             const lines = text.split('\n');
-            let outputStatuses = [];
+            
+            // Storage buckets for our structural sorting
+            let officeHours = [];
+            let rota1 = [];
+            let rota2 = [];
+            let rota3 = [];
+            
+            // Start by assuming we are reading office hours unless a header tells us otherwise
+            let currentSection = "OFFICE_HOURS"; 
 
             lines.forEach(line => {
-                line = line.trim();
+                const upperLine = line.trim().toUpperCase();
                 
-                // Only look at lines that have the " - " separator
+                // Dynamically change target buckets when hitting headers
+                if (upperLine.includes("OH NSFS MOVEMENT")) { currentSection = "OFFICE_HOURS"; return; }
+                if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
+                if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
+                if (upperLine.includes("ROTA 3")) { currentSection = "ROTA_3"; return; }
+                if (upperLine.includes("EMS TEAM:")) { return; } // Skip EMS header text safely
+
+                // Parse individual data lines
                 if (line.includes(" - ")) {
                     const parts = line.split(" - ");
                     const rightSide = parts[1].toUpperCase();
+                    let finalStatus = "";
 
-                    // Find the clean attendance code (IN, VL, MC, MA, HL)
-                    const match = rightSide.match(/\b(IN|VL|MC|MA|HL)\b/);
-                    
-                    if (match) {
-                        outputStatuses.push(match[1]);
+                    // Determine the correct clean code
+                    if (rightSide.includes("ON DUTY")) {
+                        finalStatus = "IN";
+                    } else if (rightSide.includes("OFF DUTY")) {
+                        const bracketMatch = rightSide.match(/\(([^)]+)\)/);
+                        finalStatus = bracketMatch ? bracketMatch[1].trim() : "OFF"; 
                     } else {
-                        // If no standard code is found but the line exists, keep a blank space to preserve row alignment
-                        outputStatuses.push(""); 
+                        const looseMatch = rightSide.match(/\b(IN|VL|MC|MA|HL)\b/);
+                        finalStatus = looseMatch ? looseMatch[1] : "";
                     }
+
+                    // Push data into the appropriate section bucket
+                    if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
+                    if (currentSection === "ROTA_1") rota1.push(finalStatus);
+                    if (currentSection === "ROTA_2") rota2.push(finalStatus);
+                    if (currentSection === "ROTA_3") rota3.push(finalStatus);
                 }
             });
 
-            // Join them with newlines so they copy as a vertical Excel column
-            const finalClipboardText = outputStatuses.join('\n');
+            // Enforce the rigid top-to-bottom master layout order
+            const totalOutput = [...officeHours, ...rota1, ...rota2, ...rota3];
+            const finalClipboardText = totalOutput.join('\n');
 
-            // Copy directly to your clipboard
+            // Save to system clipboard
             navigator.clipboard.writeText(finalClipboardText).then(() => {
                 const msg = document.getElementById('successMessage');
                 msg.style.display = 'block';
-                setTimeout(() => { msg.style.display = 'none'; }, 4000);
+                setTimeout(() => { msg.style.display = 'none'; }, 5000);
             });
         }
     </script>
