@@ -24,7 +24,11 @@
 
     <script>
         function processAndCopy() {
-            const text = document.getElementById('inputText').value;
+            let text = document.getElementById('inputText').value;
+            
+            // CRITICAL FIX: Convert any decorative long dashes (En Dash/Em Dash) into standard short hyphens
+            text = text.replace(/[\u2010-\u2015—–]/g, "-");
+            
             const lines = text.split('\n');
             
             let officeHours = [];
@@ -53,7 +57,7 @@
                         let finalStatus = "";
 
                         // Condition 1: Map operational deployment tasks to standard "IN" status
-                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
+                        if (rightSide.includes("ON DUTY") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
                             finalStatus = "IN";
                         } else {
                             // Condition 2: Simplify "LATE" entries cleanly to "IN"
