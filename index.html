@@ -37,7 +37,6 @@
             lines.forEach(line => {
                 const upperLine = line.trim().toUpperCase();
                 
-                // Fixed: Flexible header checking using upperLine
                 if (upperLine.includes("OH NSF")) { currentSection = "OFFICE_HOURS"; return; }
                 if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
                 if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
@@ -52,14 +51,30 @@
                     if (rightSide.includes("ON DUTY")) {
                         finalStatus = "IN";
                     } else {
-                        // Check if there is a status inside parenthesis like (VL) or (MC)
+                        // 1. Check inside brackets first for text codes like (VL) or (MC)
                         const bracketMatch = rightSide.match(/\(([^)]+)\)/);
+                        let potentialStatus = "";
+                        
                         if (bracketMatch) {
-                            finalStatus = bracketMatch[1].trim();
+                            potentialStatus = bracketMatch[1].trim();
                         } else {
-                            // Extract the first clean word found after the hyphen (handles ADO, BTO, HL, etc.)
-                            const cleanWordMatch = rightSide.match(/^([A-Z0-9]+)/);
-                            finalStatus = cleanWordMatch ? cleanWordMatch[1] : rightSide;
+                            // 2. Otherwise, find the clean alphabet-only words, ignoring dates completely
+                            // This looks for pure blocks of letters like HL, MC, ADO, BTO
+                            const words = rightSide.match(/[A-Z]+/g);
+                            if (words) {
+                                // Filter out common filler words like "OFF" or "DUTY" if a specific code is present
+                                const cleanWords = words.filter(w => w !== "OFF" && w !== "DUTY");
+                                potentialStatus = cleanWords.length > 0 ? cleanWords[0] : words[0];
+                            }
+                        }
+
+                        // Safety check: ensure whatever we extracted does NOT contain numbers or dates
+                        if (potentialStatus && !/[\d\/]/.test(potentialStatus)) {
+                            finalStatus = potentialStatus;
+                        } else {
+                            // If it's a date or broken sequence, fallback directly to scanning for standard codes
+                            const looseMatch = rightSide.match(/\b(IN|VL|MC|MA|HL|ADO|BTO)\b/);
+                            finalStatus = looseMatch ? looseMatch[1] : rightSide;
                         }
                     }
 
