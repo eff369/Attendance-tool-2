@@ -43,45 +43,50 @@
                 if (upperLine.includes("ROTA 3")) { currentSection = "ROTA_3"; return; }
                 if (upperLine.includes("EMS TEAM:")) { return; } 
 
-                if (line.includes(" - ")) {
-                    const parts = line.split(" - ");
-                    const rightSide = parts[1].toUpperCase().trim();
-                    let finalStatus = "";
+                if (line.includes("-")) {
+                    const parts = line.split(/-+/);
+                    if (parts.length >= 2) {
+                        const rightSide = parts[1].toUpperCase().trim();
+                        let finalStatus = "";
 
-                    if (rightSide.includes("ON DUTY")) {
-                        finalStatus = "IN";
-                    } else {
-                        // 1. Check inside brackets first for text codes like (VL) or (MC)
-                        const bracketMatch = rightSide.match(/\(([^)]+)\)/);
-                        let potentialStatus = "";
-                        
-                        if (bracketMatch) {
-                            potentialStatus = bracketMatch[1].trim();
+                        if (rightSide.includes("ON DUTY")) {
+                            finalStatus = "IN";
                         } else {
-                            // 2. Otherwise, find the clean alphabet-only words, ignoring dates completely
-                            // This looks for pure blocks of letters like HL, MC, ADO, BTO
-                            const words = rightSide.match(/[A-Z]+/g);
-                            if (words) {
-                                // Filter out common filler words like "OFF" or "DUTY" if a specific code is present
-                                const cleanWords = words.filter(w => w !== "OFF" && w !== "DUTY");
-                                potentialStatus = cleanWords.length > 0 ? cleanWords[0] : words[0];
+                            // 1. Look inside brackets first for text codes like (VL) or (MC)
+                            const bracketMatch = rightSide.match(/\(([^)]+)\)/);
+                            let potentialStatus = "";
+                            
+                            if (bracketMatch) {
+                                potentialStatus = bracketMatch[1].trim();
+                            } else {
+                                // 2. Extract words, but strictly separate them even if zero spaces exist
+                                const words = rightSide.match(/[A-Z]+/g);
+                                if (words) {
+                                    const cleanWords = words.filter(w => w !== "OFF" && w !== "DUTY");
+                                    potentialStatus = cleanWords.length > 0 ? cleanWords[0] : words[0];
+                                }
+                            }
+
+                            // 3. FAILSAFE: Only accept clean, recognizable codes. 
+                            // If it's a date or unrecognizable gibberish, it falls back to a clean blank cell.
+                            if (potentialStatus && !/[\d\/]/.test(potentialStatus)) {
+                                // Double check against a broad list of valid operational codes
+                                const validCodes = ["IN", "VL", "MC", "MA", "HL", "ADO", "BTO", "OFF", "RS"];
+                                if (validCodes.includes(potentialStatus)) {
+                                    finalStatus = potentialStatus;
+                                } else {
+                                    finalStatus = ""; // Leaves cell blank if it's a weird word layout
+                                }
+                            } else {
+                                finalStatus = ""; // Leaves cell blank if it's a date string
                             }
                         }
 
-                        // Safety check: ensure whatever we extracted does NOT contain numbers or dates
-                        if (potentialStatus && !/[\d\/]/.test(potentialStatus)) {
-                            finalStatus = potentialStatus;
-                        } else {
-                            // If it's a date or broken sequence, fallback directly to scanning for standard codes
-                            const looseMatch = rightSide.match(/\b(IN|VL|MC|MA|HL|ADO|BTO)\b/);
-                            finalStatus = looseMatch ? looseMatch[1] : rightSide;
-                        }
+                        if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
+                        if (currentSection === "ROTA_1") rota1.push(finalStatus);
+                        if (currentSection === "ROTA_2") rota2.push(finalStatus);
+                        if (currentSection === "ROTA_3") rota3.push(finalStatus);
                     }
-
-                    if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
-                    if (currentSection === "ROTA_1") rota1.push(finalStatus);
-                    if (currentSection === "ROTA_2") rota2.push(finalStatus);
-                    if (currentSection === "ROTA_3") rota3.push(finalStatus);
                 }
             });
 
