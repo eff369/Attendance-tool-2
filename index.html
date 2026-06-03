@@ -44,30 +44,25 @@
                 
                 if (upperLine === "EMS TEAM:" || upperLine === "EMS TEAM") { return; } 
 
-                // FIX: Detect any form of dash character (hyphen, en-dash, em-dash, etc.)
-                const dashRegex = /[\u2010-\u2015\-—–]+/;
-                
-                if (dashRegex.test(line)) {
-                    // Splits the line cleanly regardless of the type of dash used
-                    const parts = line.split(dashRegex);
+                // Look for any line splitter indicator to start pulling status text
+                if (line.includes("-") || line.includes("–") || line.includes("—")) {
+                    const parts = line.split(/[-—–]+/);
                     if (parts.length >= 2) {
                         let rightSide = parts[1].toUpperCase().trim();
                         let finalStatus = "";
 
-                        // STEP 1: Operational keyword intercepts
-                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("FORUMS") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
+                        // Added direct check for EMS FORUM / FORUM variations right at the front door
+                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("EMS FORUM") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
                             finalStatus = "IN";
                         } else {
-                            // STEP 2: Simplify late entries
                             if (/\bIN\b.*LATE/.test(rightSide) || /LATE.*\bIN\b/.test(rightSide)) {
                                 rightSide = "IN";
                             }
 
-                            // STEP 3: Check for exact complex composite phrases
                             const complexPhrases = [
                                 "AM IN PM VL", "AM VL PM IN", "AM TO PM IN", "AM IN PM TO", 
                                 "AM PM MC", "AM PM TO", "AM PM VL", "AM TO PM MIN", "AM PM HRI", 
-                                "AM CDA PM", "AM HRI PM", "AM PM HQ", "AM PM MMA", "AM PM TO MIN", "AM IN PM MA"
+                                "AM COA PM", "AM HRI PM", "AM PM HQ", "AM PM MMA", "AM PM TO MIN", "AM IN PM MA"
                             ];
                             
                             let foundComplex = complexPhrases.find(phrase => rightSide.includes(phrase));
@@ -75,7 +70,6 @@
                             if (foundComplex) {
                                 finalStatus = foundComplex;
                             } else {
-                                // STEP 4: Standard bracket/word extraction fallback
                                 const bracketMatch = rightSide.match(/\(([^)]+)\)/);
                                 let potentialStatus = "";
                                 
@@ -97,7 +91,7 @@
                                     const validCodes = [
                                         "IN", "VL", "MC", "MA", "HL", "ADO", "BTO", "OFF", "RS", 
                                         "ORD", "OVL", "CCL", "CL", "OH", "STN41", "STN42", "STN43", 
-                                        "VSCC", "HDAY", "RDR", "CDA", "HRI", "COURSE", "POSTEDOUT", "EMS FORUM"
+                                        "VSCC", "HDAY", "RDR", "CDA", "HRI", "COURSE", "POSTEDOUT"
                                     ];
                                     
                                     if (validCodes.includes(potentialStatus)) {
