@@ -46,38 +46,63 @@
                 if (line.includes("-")) {
                     const parts = line.split(/-+/);
                     if (parts.length >= 2) {
-                        const rightSide = parts[1].toUpperCase().trim();
+                        let rightSide = parts[1].toUpperCase().trim();
                         let finalStatus = "";
 
                         if (rightSide.includes("ON DUTY")) {
                             finalStatus = "IN";
                         } else {
-                            const bracketMatch = rightSide.match(/\(([^)]+)\)/);
-                            let potentialStatus = "";
+                            // 1. Pre-clear "LATE" expressions. If it contains "IN (LATE)" or "IN LATE", reduce immediately to "IN"
+                            if (/\bIN\b.*LATE/.test(rightSide) || /LATE.*\bIN\b/.test(rightSide)) {
+                                rightSide = "IN";
+                            }
+
+                            // 2. Scan for specific multi-word configuration phrases found in your logs
+                            const complexPhrases = [
+                                "AM IN PM VL", "AM VL PM IN", "AM TO PM IN", "AM IN PM TO", 
+                                "AM PM MC", "AM PM TO", "AM PM VL", "AM TO PM MIN", "AM PM HRI", 
+                                "AM COA PM", "AM HRI PM", "AM PM HQ", "AM PM MMA", "AM PM TO MIN"
+                            ];
                             
-                            if (bracketMatch) {
-                                potentialStatus = bracketMatch[1].trim();
+                            let foundComplex = complexPhrases.find(phrase => rightSide.includes(phrase));
+
+                            if (foundComplex) {
+                                finalStatus = foundComplex;
                             } else {
-                                const words = rightSide.match(/[A-Z]+/g);
-                                if (words) {
-                                    const cleanWords = words.filter(w => w !== "OFF" && w !== "DUTY");
-                                    potentialStatus = cleanWords.length > 0 ? cleanWords[0] : words[0];
+                                // 3. Fall back to standard extraction if no complex half-day pattern matches
+                                const bracketMatch = rightSide.match(/\(([^)]+)\)/);
+                                let potentialStatus = "";
+                                
+                                if (bracketMatch) {
+                                    potentialStatus = bracketMatch[1].trim();
+                                } else {
+                                    const words = rightSide.match(/[A-Z0-9]+/g);
+                                    if (words) {
+                                        const cleanWords = words.filter(w => w !== "OFF" && w !== "DUTY");
+                                        potentialStatus = cleanWords.length > 0 ? cleanWords[0] : words[0];
+                                    }
                                 }
-                            }
 
-                            if (potentialStatus) {
-                                potentialStatus = potentialStatus.replace(/\s+/g, '');
-                            }
+                                if (potentialStatus) {
+                                    potentialStatus = potentialStatus.replace(/\s+/g, '');
+                                }
 
-                            if (potentialStatus && !/[\d\/]/.test(potentialStatus)) {
-                                const validCodes = ["IN", "VL", "MC", "MA", "HL", "ADO", "BTO", "OFF", "RS"];
-                                if (validCodes.includes(potentialStatus)) {
-                                    finalStatus = potentialStatus;
+                                // 4. Check status token against your expanded list of master operational terms
+                                if (potentialStatus && !/[\d\/]/.test(potentialStatus)) {
+                                    const validCodes = [
+                                        "IN", "VL", "MC", "MA", "HL", "ADO", "BTO", "OFF", "RS", 
+                                        "ORD", "OVL", "CCL", "CL", "OH", "STN41", "STN42", "STN43", 
+                                        "VSCC", "HDAY", "RDR", "CDA", "HRI", "COURSE", "POSTEDOUT"
+                                    ];
+                                    
+                                    if (validCodes.includes(potentialStatus)) {
+                                        finalStatus = potentialStatus;
+                                    } else {
+                                        finalStatus = ""; 
+                                    }
                                 } else {
                                     finalStatus = ""; 
                                 }
-                            } else {
-                                finalStatus = ""; 
                             }
                         }
 
