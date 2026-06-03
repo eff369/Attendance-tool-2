@@ -37,33 +37,31 @@
             lines.forEach(line => {
                 const upperLine = line.trim().toUpperCase();
                 
-                // Track headers cleanly
+                // FIXED: Strict section header matches so they never cross-trigger on personnel data lines
                 if (upperLine.includes("OH NSF") || upperLine.includes("MOVEMENT CHART")) { currentSection = "OFFICE_HOURS"; return; }
                 if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
                 if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
                 if (upperLine.includes("ROTA 3")) { currentSection = "ROTA_3"; return; }
                 
+                // Strictly ignore the EMS standalone header row without skipping EMS personnel lines
                 if (upperLine === "EMS TEAM:" || upperLine === "EMS TEAM") { return; } 
 
-                // FIX: Check for any variation of dash character
-                const dashRegex = /[\u2010-\u2015\-—–]+/;
-                
-                if (dashRegex.test(line)) {
-                    const parts = line.split(dashRegex);
+                if (line.includes("-")) {
+                    const parts = line.split(/-+/);
                     if (parts.length >= 2) {
                         let rightSide = parts[1].toUpperCase().trim();
                         let finalStatus = "";
 
-                        // Step 1: Force match operational locations to "IN"
-                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("FORUMS") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
+                        // Condition 1: Map operational deployment tasks to standard "IN" status
+                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
                             finalStatus = "IN";
                         } else {
-                            // Step 2: Clear out late variations
+                            // Condition 2: Simplify "LATE" entries cleanly to "IN"
                             if (/\bIN\b.*LATE/.test(rightSide) || /LATE.*\bIN\b/.test(rightSide)) {
                                 rightSide = "IN";
                             }
 
-                            // Step 3: Check for exact complex composite phrases
+                            // Condition 3: Match layout complex composite phrases
                             const complexPhrases = [
                                 "AM IN PM VL", "AM VL PM IN", "AM TO PM IN", "AM IN PM TO", 
                                 "AM PM MC", "AM PM TO", "AM PM VL", "AM TO PM MIN", "AM PM HRI", 
@@ -75,7 +73,7 @@
                             if (foundComplex) {
                                 finalStatus = foundComplex;
                             } else {
-                                // Step 4: Bracket/Word clean extraction fallback
+                                // Condition 4: Extract bracketed texts or single code words
                                 const bracketMatch = rightSide.match(/\(([^)]+)\)/);
                                 let potentialStatus = "";
                                 
@@ -111,13 +109,24 @@
                             }
                         }
 
-                        // Save exactly to our target data arrays
+                        // Save to target sorting bucket
                         if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
                         if (currentSection === "ROTA_1") rota1.push(finalStatus);
                         if (currentSection === "ROTA_2") rota2.push(finalStatus);
                         if (currentSection === "ROTA_3") rota3.push(finalStatus);
                     }
                 }
-            </script>
+            });
+
+            const totalOutput = [...officeHours, ...rota1, ...rota2, ...rota3];
+            const finalClipboardText = totalOutput.join('\n');
+
+            navigator.clipboard.writeText(finalClipboardText).then(() => {
+                const msg = document.getElementById('successMessage');
+                msg.style.display = 'block';
+                setTimeout(() => { msg.style.display = 'none'; }, 4000);
+            });
+        }
+    </script>
 </body>
 </html>
