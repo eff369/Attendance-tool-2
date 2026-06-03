@@ -27,43 +27,42 @@
             const text = document.getElementById('inputText').value;
             const lines = text.split('\n');
             
-            // Storage buckets for our structural sorting
             let officeHours = [];
             let rota1 = [];
             let rota2 = [];
             let rota3 = [];
             
-            // Start by assuming we are reading office hours unless a header tells us otherwise
             let currentSection = "OFFICE_HOURS"; 
 
             lines.forEach(line => {
                 const upperLine = line.trim().toUpperCase();
                 
-                // Dynamically change target buckets when hitting headers
-                if (upperLine.includes("OH NSFS MOVEMENT")) { currentSection = "OFFICE_HOURS"; return; }
+                // Fixed: Flexible header checking using upperLine
+                if (upperLine.includes("OH NSF")) { currentSection = "OFFICE_HOURS"; return; }
                 if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
                 if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
                 if (upperLine.includes("ROTA 3")) { currentSection = "ROTA_3"; return; }
-                if (upperLine.includes("EMS TEAM:")) { return; } // Skip EMS header text safely
+                if (upperLine.includes("EMS TEAM:")) { return; } 
 
-                // Parse individual data lines
                 if (line.includes(" - ")) {
                     const parts = line.split(" - ");
-                    const rightSide = parts[1].toUpperCase();
+                    const rightSide = parts[1].toUpperCase().trim();
                     let finalStatus = "";
 
-                    // Determine the correct clean code
                     if (rightSide.includes("ON DUTY")) {
                         finalStatus = "IN";
-                    } else if (rightSide.includes("OFF DUTY")) {
-                        const bracketMatch = rightSide.match(/\(([^)]+)\)/);
-                        finalStatus = bracketMatch ? bracketMatch[1].trim() : "OFF"; 
                     } else {
-                        const looseMatch = rightSide.match(/\b(IN|VL|MC|MA|HL)\b/);
-                        finalStatus = looseMatch ? looseMatch[1] : "";
+                        // Check if there is a status inside parenthesis like (VL) or (MC)
+                        const bracketMatch = rightSide.match(/\(([^)]+)\)/);
+                        if (bracketMatch) {
+                            finalStatus = bracketMatch[1].trim();
+                        } else {
+                            // Extract the first clean word found after the hyphen (handles ADO, BTO, HL, etc.)
+                            const cleanWordMatch = rightSide.match(/^([A-Z0-9]+)/);
+                            finalStatus = cleanWordMatch ? cleanWordMatch[1] : rightSide;
+                        }
                     }
 
-                    // Push data into the appropriate section bucket
                     if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
                     if (currentSection === "ROTA_1") rota1.push(finalStatus);
                     if (currentSection === "ROTA_2") rota2.push(finalStatus);
@@ -71,11 +70,9 @@
                 }
             });
 
-            // Enforce the rigid top-to-bottom master layout order
             const totalOutput = [...officeHours, ...rota1, ...rota2, ...rota3];
             const finalClipboardText = totalOutput.join('\n');
 
-            // Save to system clipboard
             navigator.clipboard.writeText(finalClipboardText).then(() => {
                 const msg = document.getElementById('successMessage');
                 msg.style.display = 'block';
