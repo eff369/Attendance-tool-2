@@ -20,7 +20,7 @@
     
     <button onclick="processAndCopy()">Sort & Copy Entire Column</button>
     
-    <div id="successMessage" class="success-box">Copied! Select cell E15 (LCP IRFAN) and hit Ctrl+V.</div>
+    <div id="successMessage" class="success-box">Copied!</div>
 
     <script>
         function processAndCopy() {
@@ -52,14 +52,13 @@
                         if (rightSide.includes("ON DUTY")) {
                             finalStatus = "IN";
                         } else {
-                            // 1. Look inside brackets first for text codes like (VL) or (MC)
                             const bracketMatch = rightSide.match(/\(([^)]+)\)/);
                             let potentialStatus = "";
                             
                             if (bracketMatch) {
                                 potentialStatus = bracketMatch[1].trim();
                             } else {
-                                // 2. Extract words, but strictly separate them even if zero spaces exist
+                                // Extract any pure alphabetic sequences
                                 const words = rightSide.match(/[A-Z]+/g);
                                 if (words) {
                                     const cleanWords = words.filter(w => w !== "OFF" && w !== "DUTY");
@@ -67,18 +66,20 @@
                                 }
                             }
 
-                            // 3. FAILSAFE: Only accept clean, recognizable codes. 
-                            // If it's a date or unrecognizable gibberish, it falls back to a clean blank cell.
+                            // Completely strip out any hidden white spaces or rogue characters
+                            if (potentialStatus) {
+                                potentialStatus = potentialStatus.replace(/\s+/g, '');
+                            }
+
                             if (potentialStatus && !/[\d\/]/.test(potentialStatus)) {
-                                // Double check against a broad list of valid operational codes
                                 const validCodes = ["IN", "VL", "MC", "MA", "HL", "ADO", "BTO", "OFF", "RS"];
                                 if (validCodes.includes(potentialStatus)) {
                                     finalStatus = potentialStatus;
                                 } else {
-                                    finalStatus = ""; // Leaves cell blank if it's a weird word layout
+                                    finalStatus = ""; // Failsafe triggers blank cell
                                 }
                             } else {
-                                finalStatus = ""; // Leaves cell blank if it's a date string
+                                finalStatus = ""; // Failsafe triggers blank cell
                             }
                         }
 
@@ -96,7 +97,7 @@
             navigator.clipboard.writeText(finalClipboardText).then(() => {
                 const msg = document.getElementById('successMessage');
                 msg.style.display = 'block';
-                setTimeout(() => { msg.style.display = 'none'; }, 5000);
+                setTimeout(() => { msg.style.display = 'none'; }, 4000);
             });
         }
     </script>
