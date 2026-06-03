@@ -37,7 +37,8 @@
             lines.forEach(line => {
                 const upperLine = line.trim().toUpperCase();
                 
-                if (upperLine.includes("OH NSF")) { currentSection = "OFFICE_HOURS"; return; }
+                // Fixed: More flexible section header scanning matching "ROTA 3 DAY SHIFT" etc.
+                if (upperLine.includes("OH NSF") || upperLine.includes("MOVEMENT CHART")) { currentSection = "OFFICE_HOURS"; return; }
                 if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
                 if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
                 if (upperLine.includes("ROTA 3")) { currentSection = "ROTA_3"; return; }
@@ -49,15 +50,18 @@
                         let rightSide = parts[1].toUpperCase().trim();
                         let finalStatus = "";
 
+                        // Rule 1: Custom Operational Mappings (EMS Forum, HQ, etc. count as IN)
                         if (rightSide.includes("ON DUTY")) {
                             finalStatus = "IN";
+                        } else if (rightSide.includes("FORUM") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
+                            finalStatus = "IN";
                         } else {
-                            // 1. Pre-clear "LATE" expressions. If it contains "IN (LATE)" or "IN LATE", reduce immediately to "IN"
+                            // Rule 2: Clean out late variations
                             if (/\bIN\b.*LATE/.test(rightSide) || /LATE.*\bIN\b/.test(rightSide)) {
                                 rightSide = "IN";
                             }
 
-                            // 2. Scan for specific multi-word configuration phrases found in your logs
+                            // Rule 3: Complex Phrases Check
                             const complexPhrases = [
                                 "AM IN PM VL", "AM VL PM IN", "AM TO PM IN", "AM IN PM TO", 
                                 "AM PM MC", "AM PM TO", "AM PM VL", "AM TO PM MIN", "AM PM HRI", 
@@ -69,7 +73,7 @@
                             if (foundComplex) {
                                 finalStatus = foundComplex;
                             } else {
-                                // 3. Fall back to standard extraction if no complex half-day pattern matches
+                                // Rule 4: Extract Brackets or individual tokens
                                 const bracketMatch = rightSide.match(/\(([^)]+)\)/);
                                 let potentialStatus = "";
                                 
@@ -87,7 +91,6 @@
                                     potentialStatus = potentialStatus.replace(/\s+/g, '');
                                 }
 
-                                // 4. Check status token against your expanded list of master operational terms
                                 if (potentialStatus && !/[\d\/]/.test(potentialStatus)) {
                                     const validCodes = [
                                         "IN", "VL", "MC", "MA", "HL", "ADO", "BTO", "OFF", "RS", 
@@ -106,6 +109,7 @@
                             }
                         }
 
+                        // FIXED: Every line processed MUST push a string (even if empty "") to maintain perfect alignment
                         if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
                         if (currentSection === "ROTA_1") rota1.push(finalStatus);
                         if (currentSection === "ROTA_2") rota2.push(finalStatus);
