@@ -37,6 +37,7 @@
             lines.forEach(line => {
                 const upperLine = line.trim().toUpperCase();
                 
+                // Track headers cleanly
                 if (upperLine.includes("OH NSF") || upperLine.includes("MOVEMENT CHART")) { currentSection = "OFFICE_HOURS"; return; }
                 if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
                 if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
@@ -44,21 +45,25 @@
                 
                 if (upperLine === "EMS TEAM:" || upperLine === "EMS TEAM") { return; } 
 
-                // Look for any line splitter indicator to start pulling status text
-                if (line.includes("-") || line.includes("–") || line.includes("—")) {
-                    const parts = line.split(/[-—–]+/);
+                // FIX: Check for any variation of dash character
+                const dashRegex = /[\u2010-\u2015\-—–]+/;
+                
+                if (dashRegex.test(line)) {
+                    const parts = line.split(dashRegex);
                     if (parts.length >= 2) {
                         let rightSide = parts[1].toUpperCase().trim();
                         let finalStatus = "";
 
-                        // Added direct check for EMS FORUM / FORUM variations right at the front door
-                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("EMS FORUM") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
+                        // Step 1: Force match operational locations to "IN"
+                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("FORUMS") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
                             finalStatus = "IN";
                         } else {
+                            // Step 2: Clear out late variations
                             if (/\bIN\b.*LATE/.test(rightSide) || /LATE.*\bIN\b/.test(rightSide)) {
                                 rightSide = "IN";
                             }
 
+                            // Step 3: Check for exact complex composite phrases
                             const complexPhrases = [
                                 "AM IN PM VL", "AM VL PM IN", "AM TO PM IN", "AM IN PM TO", 
                                 "AM PM MC", "AM PM TO", "AM PM VL", "AM TO PM MIN", "AM PM HRI", 
@@ -70,6 +75,7 @@
                             if (foundComplex) {
                                 finalStatus = foundComplex;
                             } else {
+                                // Step 4: Bracket/Word clean extraction fallback
                                 const bracketMatch = rightSide.match(/\(([^)]+)\)/);
                                 let potentialStatus = "";
                                 
@@ -105,23 +111,13 @@
                             }
                         }
 
+                        // Save exactly to our target data arrays
                         if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
                         if (currentSection === "ROTA_1") rota1.push(finalStatus);
                         if (currentSection === "ROTA_2") rota2.push(finalStatus);
                         if (currentSection === "ROTA_3") rota3.push(finalStatus);
                     }
                 }
-            });
-
-            const totalOutput = [...officeHours, ...rota1, ...rota2, ...rota3];
-            const finalClipboardText = totalOutput.join('\n');
-
-            navigator.clipboard.writeText(finalClipboardText).then(() => {
-                const msg = document.getElementById('successMessage');
-                msg.style.display = 'block';
-                setTimeout(() => { msg.style.display = 'none'; }, 4000);
-            });
-        }
-    </script>
+            </script>
 </body>
 </html>
