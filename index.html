@@ -37,12 +37,14 @@
             lines.forEach(line => {
                 const upperLine = line.trim().toUpperCase();
                 
-                // Fixed: More flexible section header scanning matching "ROTA 3 DAY SHIFT" etc.
+                // FIXED: Strict section header matches so they never cross-trigger on personnel data lines
                 if (upperLine.includes("OH NSF") || upperLine.includes("MOVEMENT CHART")) { currentSection = "OFFICE_HOURS"; return; }
                 if (upperLine.includes("ROTA 1")) { currentSection = "ROTA_1"; return; }
                 if (upperLine.includes("ROTA 2")) { currentSection = "ROTA_2"; return; }
                 if (upperLine.includes("ROTA 3")) { currentSection = "ROTA_3"; return; }
-                if (upperLine.includes("EMS TEAM:")) { return; } 
+                
+                // Strictly ignore the EMS standalone header row without skipping EMS personnel lines
+                if (upperLine === "EMS TEAM:" || upperLine === "EMS TEAM") { return; } 
 
                 if (line.includes("-")) {
                     const parts = line.split(/-+/);
@@ -50,22 +52,20 @@
                         let rightSide = parts[1].toUpperCase().trim();
                         let finalStatus = "";
 
-                        // Rule 1: Custom Operational Mappings (EMS Forum, HQ, etc. count as IN)
-                        if (rightSide.includes("ON DUTY")) {
-                            finalStatus = "IN";
-                        } else if (rightSide.includes("FORUM") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
+                        // Condition 1: Map operational deployment tasks to standard "IN" status
+                        if (rightSide.includes("ON DUTY") || rightSide.includes("FORUM") || rightSide.includes("HQ") || rightSide.includes("CDA")) {
                             finalStatus = "IN";
                         } else {
-                            // Rule 2: Clean out late variations
+                            // Condition 2: Simplify "LATE" entries cleanly to "IN"
                             if (/\bIN\b.*LATE/.test(rightSide) || /LATE.*\bIN\b/.test(rightSide)) {
                                 rightSide = "IN";
                             }
 
-                            // Rule 3: Complex Phrases Check
+                            // Condition 3: Match layout complex composite phrases
                             const complexPhrases = [
                                 "AM IN PM VL", "AM VL PM IN", "AM TO PM IN", "AM IN PM TO", 
                                 "AM PM MC", "AM PM TO", "AM PM VL", "AM TO PM MIN", "AM PM HRI", 
-                                "AM COA PM", "AM HRI PM", "AM PM HQ", "AM PM MMA", "AM PM TO MIN"
+                                "AM COA PM", "AM HRI PM", "AM PM HQ", "AM PM MMA", "AM PM TO MIN", "AM IN PM MA"
                             ];
                             
                             let foundComplex = complexPhrases.find(phrase => rightSide.includes(phrase));
@@ -73,7 +73,7 @@
                             if (foundComplex) {
                                 finalStatus = foundComplex;
                             } else {
-                                // Rule 4: Extract Brackets or individual tokens
+                                // Condition 4: Extract bracketed texts or single code words
                                 const bracketMatch = rightSide.match(/\(([^)]+)\)/);
                                 let potentialStatus = "";
                                 
@@ -109,7 +109,7 @@
                             }
                         }
 
-                        // FIXED: Every line processed MUST push a string (even if empty "") to maintain perfect alignment
+                        // Save to target sorting bucket
                         if (currentSection === "OFFICE_HOURS") officeHours.push(finalStatus);
                         if (currentSection === "ROTA_1") rota1.push(finalStatus);
                         if (currentSection === "ROTA_2") rota2.push(finalStatus);
